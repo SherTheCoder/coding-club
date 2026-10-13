@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+.sites-runtime/
+.vinext/
+.wrangler/
+*.tsbuildinfo
+.DS_Store
