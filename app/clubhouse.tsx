@@ -1,109 +1,1170 @@
 'use client';
-import {useState,useEffect,useRef,useCallback} from 'react';
-import {ArrowUpRight,ArrowRight,ArrowLeft,Bell,BookOpen,CalendarDays,Check,ChevronDown,Code2,ExternalLink,GitFork,Plus,Search,Users,X,Clock,CheckCheck,LogOut,KeyRound} from 'lucide-react';
-import {MEMBERS,SUGGESTIONS,TOPICS,sessionLabel,calendarEvent} from '../lib/club.mjs';
-import {GraphArt,ProblemArt} from './art';
-import {createRefreshGate,notifySafely,buildLibrary,emptyClubData} from '../lib/client-state.mjs';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  ArrowUpRight,
+  ArrowRight,
+  ArrowLeft,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Code2,
+  ExternalLink,
+  GitFork,
+  Plus,
+  Search,
+  Users,
+  X,
+  Clock,
+  CheckCheck,
+  LogOut,
+  KeyRound,
+} from 'lucide-react';
+import {
+  MEMBERS,
+  SUGGESTIONS,
+  TOPICS,
+  sessionLabel,
+  calendarEvent,
+} from '../lib/club.mjs';
+import { GraphArt, ProblemArt } from './art';
+import {
+  createRefreshGate,
+  notifySafely,
+  buildLibrary,
+  emptyClubData,
+} from '../lib/client-state.mjs';
 import Modal from './modal';
 import QuestionForm from './question-form';
 import AuthForm from './auth-form';
-import type {Claim,Problem,ClubData} from './types';
-import {connected,loadClub,saveChange,signOut,onIdentityChange} from '../lib/backend';
+import type { Claim, Problem, ClubData } from './types';
+import {
+  connected,
+  loadClub,
+  saveChange,
+  signOut,
+  onIdentityChange,
+} from '../lib/backend';
 
-type View='sessions'|'library'|'club';
-type ModalState={type:'claim';slot:number;claim?:Claim;suggestion?:Problem}|{type:'problem';problem:Problem}|{type:'join'}|{type:'inbox'}|{type:'profile'}|{type:'signin'}|{type:'password'}|null;
-const initials=(name:string)=>name.split(' ').map(p=>p[0]).join('').slice(0,2);
-function Avatar({name,size='normal'}:{name:string;size?:string}){return <span className={'avatar avatar-'+MEMBERS.indexOf(name)+' '+size} title={name}>{initials(name)}</span>;}
-export default function Clubhouse({initialDates}:{initialDates:string[]}) {
-  const [data,setData]=useState<ClubData>(emptyClubData(initialDates));
-  const [view,setView]=useState<View>('sessions');const [date,setDate]=useState(initialDates[0]);
-  const [modal,setModal]=useState<ModalState>(null);const pending=useRef<ModalState>(null);
-  const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState('');
-  const [toast,setToast]=useState('');const [search,setSearch]=useState('');const [topic,setTopic]=useState('All topics');const [filter,setFilter]=useState('All problems');
-  const [browserAlerts,setBrowserAlerts]=useState(false);const [permissionNote,setPermissionNote]=useState('');
-  const refreshGate=useRef(createRefreshGate());const startingDates=useRef(initialDates);
-  const seen=useRef<Set<string>|null>(null);const enabled=useRef(false);const [busy,setBusy]=useState(false);const [joinError,setJoinError]=useState('');
-  const refresh=useCallback(async()=>{
-    const generation=refreshGate.current.begin();
-    try{
-      const result=await loadClub();
-      if(!refreshGate.current.isCurrent(generation))return;
-      if(!result.signedIn){setData(emptyClubData(startingDates.current));setModal(current=>current?.type==='signin'?current:null);seen.current=null;setLoadError('');return;}
-      if(seen.current && enabled.current && typeof Notification!=='undefined' && Notification.permission==='granted'){
-        const fresh=result.inbox.filter((n:any)=>!seen.current!.has(n.id)&&!n.read);
-        if(fresh.length&&!notifySafely((title:string,options:NotificationOptions)=>new Notification(title,options),fresh.length===1?fresh[0].title:`${fresh.length} new Coding Club updates`,fresh[0].body,()=>{window.focus();setModal({type:'inbox'});})){enabled.current=false;setBrowserAlerts(false);setPermissionNote('This browser cannot show desktop alerts. Your inbox will keep updating.');}
+type View = 'sessions' | 'library' | 'club';
+type ModalState =
+  | { type: 'claim'; slot: number; claim?: Claim; suggestion?: Problem }
+  | { type: 'problem'; problem: Problem }
+  | { type: 'join' }
+  | { type: 'inbox' }
+  | { type: 'profile' }
+  | { type: 'signin' }
+  | { type: 'password' }
+  | null;
+const initials = (name: string) =>
+  name
+    .split(' ')
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2);
+function Avatar({ name, size = 'normal' }: { name: string; size?: string }) {
+  return (
+    <span
+      className={'avatar avatar-' + MEMBERS.indexOf(name) + ' ' + size}
+      title={name}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+export default function Clubhouse({
+  initialDates,
+}: {
+  initialDates: string[];
+}) {
+  const [data, setData] = useState<ClubData>(emptyClubData(initialDates));
+  const [view, setView] = useState<View>('sessions');
+  const [date, setDate] = useState(initialDates[0]);
+  const [modal, setModal] = useState<ModalState>(null);
+  const pending = useRef<ModalState>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [toast, setToast] = useState('');
+  const [search, setSearch] = useState('');
+  const [topic, setTopic] = useState('All topics');
+  const [filter, setFilter] = useState('All problems');
+  const [browserAlerts, setBrowserAlerts] = useState(false);
+  const [permissionNote, setPermissionNote] = useState('');
+  const refreshGate = useRef(createRefreshGate());
+  const startingDates = useRef(initialDates);
+  const seen = useRef<Set<string> | null>(null);
+  const enabled = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const refresh = useCallback(async () => {
+    const generation = refreshGate.current.begin();
+    try {
+      const result = await loadClub();
+      if (!refreshGate.current.isCurrent(generation)) return;
+      if (!result.signedIn) {
+        setData(emptyClubData(startingDates.current));
+        setModal((current) => (current?.type === 'signin' ? current : null));
+        seen.current = null;
+        setLoadError('');
+        return;
       }
-      seen.current=new Set(result.inbox.map((n:any)=>n.id));setData(result);setLoadError('');setDate(current=>result.dates.includes(current)||result.claims.some(c=>c.session_date===current)?current:result.dates[0]);
-    }catch(e){if(refreshGate.current.isCurrent(generation)){setLoadError((e as Error).message);if(connected){setData(emptyClubData(startingDates.current));setModal(null);seen.current=null;}}}finally{if(refreshGate.current.isCurrent(generation))setLoading(false);}
-  },[]);
-  useEffect(()=>{
-    try{const pref=localStorage.getItem('club-browser-alerts')==='on';enabled.current=pref;setBrowserAlerts(pref);}catch{}
-    refresh();const unsubscribe=onIdentityChange(refresh);const interval=setInterval(refresh,20000);const focus=()=>refresh();window.addEventListener('focus',focus);
-    return()=>{unsubscribe();clearInterval(interval);window.removeEventListener('focus',focus);};
-  },[refresh]);
-  useEffect(()=>{if(data.profile&&modal?.type==='signin'){const next=pending.current;pending.current=null;setModal(next);}},[data.profile,modal?.type]);
-  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),4500);return()=>clearTimeout(t);},[toast]);
-  async function mutate(payload:any){const result=await saveChange(payload);await refresh();return result;}
-  function ensureMember(next:ModalState=null){
-    if(loading||loadError){setToast('Loading. Please try again.');return false;}
-    if(!data.signedIn){pending.current=next;setModal({type:'signin'});return false;}
-    if(!data.profile){pending.current=next;setModal({type:'join'});return false;}return true;
+      if (
+        seen.current &&
+        enabled.current &&
+        typeof Notification !== 'undefined' &&
+        Notification.permission === 'granted'
+      ) {
+        const fresh = result.inbox.filter(
+          (n: any) => !seen.current!.has(n.id) && !n.read,
+        );
+        if (
+          fresh.length &&
+          !notifySafely(
+            (title: string, options: NotificationOptions) =>
+              new Notification(title, options),
+            fresh.length === 1
+              ? fresh[0].title
+              : `${fresh.length} new Coding Club updates`,
+            fresh[0].body,
+            () => {
+              window.focus();
+              setModal({ type: 'inbox' });
+            },
+          )
+        ) {
+          enabled.current = false;
+          setBrowserAlerts(false);
+          setPermissionNote(
+            'This browser cannot show desktop alerts. Your inbox will keep updating.',
+          );
+        }
+      }
+      seen.current = new Set(result.inbox.map((n: any) => n.id));
+      setData(result);
+      setLoadError('');
+      setDate((current) =>
+        result.dates.includes(current) ||
+        result.claims.some((c) => c.session_date === current)
+          ? current
+          : result.dates[0],
+      );
+    } catch (e) {
+      if (refreshGate.current.isCurrent(generation)) {
+        setLoadError((e as Error).message);
+        if (connected) {
+          setData(emptyClubData(startingDates.current));
+          setModal(null);
+          seen.current = null;
+        }
+      }
+    } finally {
+      if (refreshGate.current.isCurrent(generation)) setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      const pref = localStorage.getItem('club-browser-alerts') === 'on';
+      enabled.current = pref;
+      setBrowserAlerts(pref);
+    } catch {}
+    refresh();
+    const unsubscribe = onIdentityChange(refresh);
+    const interval = setInterval(refresh, 20000);
+    const focus = () => refresh();
+    window.addEventListener('focus', focus);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+      window.removeEventListener('focus', focus);
+    };
+  }, [refresh]);
+  useEffect(() => {
+    if (data.profile && modal?.type === 'signin') {
+      const next = pending.current;
+      pending.current = null;
+      setModal(next);
+    }
+  }, [data.profile, modal?.type]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(''), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
+  async function mutate(payload: any) {
+    const result = await saveChange(payload);
+    await refresh();
+    return result;
   }
-  const claims=data.claims.filter(c=>c.session_date===date).sort((a,b)=>a.slot-b.slot);
-  const own=claims.find(c=>c.name===data.profile);const past=!data.dates.includes(date);
-  function claim(slot?:number,suggestion?:Problem){
-    if(past){setDate(data.dates[0]);setToast('Choose a teaching spot in the upcoming session.');setView('sessions');setModal(null);return;}
-    if(own){setModal({type:'claim',slot:own.slot,claim:own});return;}
-    const available=slot||[1,2,3].find(s=>!claims.some(c=>c.slot===s));
-    if(!available){setToast('All three spots are taken. Choose the next session.');setView('sessions');setModal(null);return;}
-    const next:ModalState={type:'claim',slot:available,suggestion};if(ensureMember(next))setModal(next);
+  function ensureMember(next: ModalState = null) {
+    if (loading || loadError) {
+      setToast('Loading. Please try again.');
+      return false;
+    }
+    if (!data.signedIn) {
+      pending.current = next;
+      setModal({ type: 'signin' });
+      return false;
+    }
+    if (!data.profile) {
+      pending.current = next;
+      setModal({ type: 'join' });
+      return false;
+    }
+    return true;
   }
-  async function solve(problem:Problem){if(!ensureMember())return;setBusy(true);try{await mutate({action:'practice',url:problem.url,completed:!data.solved.includes(problem.url)});}catch(e){setToast((e as Error).message);}finally{setBusy(false);}}
-  function calendar(){const blob=new Blob([calendarEvent(date)],{type:'text/calendar;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='coding-club-'+date+'.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setToast('Calendar file downloaded, with a 30-minute reminder.');}
-  async function toggleNotifications(){
-    if(browserAlerts){try{localStorage.setItem('club-browser-alerts','off');}catch{}enabled.current=false;setBrowserAlerts(false);return;}
-    if(!('Notification' in window)){setPermissionNote('This browser does not support desktop notifications. Your inbox still works.');return;}
-    const permission=await Notification.requestPermission();
-    if(permission==='granted'){try{localStorage.setItem('club-browser-alerts','on');}catch{}enabled.current=true;setBrowserAlerts(true);setPermissionNote('Browser alerts are on while this site is open.');}else setPermissionNote('Notifications are blocked or dismissed. You can enable them in browser settings.');
+  const claims = data.claims
+    .filter((c) => c.session_date === date)
+    .sort((a, b) => a.slot - b.slot);
+  const own = claims.find((c) => c.name === data.profile);
+  const past = !data.dates.includes(date);
+  function claim(slot?: number, suggestion?: Problem) {
+    if (past) {
+      setDate(data.dates[0]);
+      setToast('Choose a teaching spot in the upcoming session.');
+      setView('sessions');
+      setModal(null);
+      return;
+    }
+    if (own) {
+      setModal({ type: 'claim', slot: own.slot, claim: own });
+      return;
+    }
+    const available =
+      slot || [1, 2, 3].find((s) => !claims.some((c) => c.slot === s));
+    if (!available) {
+      setToast('All three spots are taken. Choose the next session.');
+      setView('sessions');
+      setModal(null);
+      return;
+    }
+    const next: ModalState = { type: 'claim', slot: available, suggestion };
+    if (ensureMember(next)) setModal(next);
   }
-  const library:Problem[]=buildLibrary(SUGGESTIONS,data.claims,data.practiced);
-  const filtered=library.filter(p=>(topic==='All topics'||p.topic===topic)&&p.title.toLowerCase().includes(search.toLowerCase())&&(filter==='All problems'||(filter==='Completed'?data.solved.includes(p.url):!data.solved.includes(p.url))));
-  const unread=data.inbox.filter(n=>!n.read).length;
-  const dates=Array.from(new Set([...data.dates,...data.claims.map(c=>c.session_date)])).sort();
-  const relativeDate=new Date(date+'T12:30:00Z');
-  function problemCard(p:Problem,index:number){const solved=data.solved.includes(p.url);return <article className="problem-card" key={p.url}>
-    <button className="art-button" aria-label={'View '+p.title} onClick={()=>setModal({type:'problem',problem:p})}><ProblemArt kind={p.art||SUGGESTIONS.find(s=>s.url===p.url)?.art||'course'}/><span className="art-index">{String(index+1).padStart(2,'0')}</span><span className="art-arrow"><ArrowUpRight size={18}/></span></button>
-    <div className="problem-card-body"><div className="problem-meta"><span>{p.number?'LC '+p.number:p.name?'FROM THE CLUB':'LEETCODE'}</span><span className={'difficulty '+p.difficulty.toLowerCase()}>{p.difficulty}</span></div><button className="problem-title" onClick={()=>setModal({type:'problem',problem:p})}>{p.title}</button><div className="problem-bottom"><span>{p.pattern||p.topic}</span><button className={'solve-button '+(solved?'done':'')} disabled={busy} onClick={()=>solve(p)} aria-label={(solved?'Mark incomplete: ':'Mark completed: ')+p.title} aria-pressed={solved}>{solved?<Check size={15}/>:<span/>}</button></div></div>
-  </article>;}
-  return <div className="app-shell">
-    <aside className="sidebar"><button className="wordmark" onClick={()=>setView('sessions')} aria-label="Coding Club home"><span className="logo"><Code2 size={23}/></span><span>CODING CLUB</span></button>
-      <nav aria-label="Main navigation">{([{id:'sessions',label:'Sessions',icon:CalendarDays},{id:'library',label:'Library',icon:BookOpen},{id:'club',label:'Members',icon:Users}] as const).map(item=><button key={item.id} className={view===item.id?'active':''} onClick={()=>setView(item.id)}><item.icon size={17}/><span>{item.label}</span></button>)}</nav><span className="header-schedule mono">TUE / THU <span>18:00—20:00 IST</span></span>
-    </aside>
-    <main className="main"><header className="topbar"><div className="breadcrumb"><span className="status-dot"/> {view==='sessions'?'Session board':view==='library'?'Problem library':'Members'}</div><div className="topbar-actions">{!connected&&<span className="preview-badge" title="Changes are saved in this browser only until Supabase is connected.">Local preview · not shared</span>}<button className="icon-button bell-button" aria-label={`Open inbox, ${unread} unread updates`} onClick={()=>{if(ensureMember({type:'inbox'}))setModal({type:'inbox'});}}><Bell size={19}/>{unread>0&&<span className="notification-count">{unread>9?'9+':unread}</span>}</button><button className="profile-button" aria-label={data.profile ? `Profile: ${data.profile}` : connected ? 'Sign in' : 'Select member'} onClick={()=>{if(ensureMember({type:'profile'}))setModal({type:'profile'});}}>{data.profile?<Avatar name={data.profile} size="small"/>:<span className="avatar guest small"><Users size={16}/></span>}<span>{data.profile||(connected?'Sign in':'Select member')}</span><ChevronDown size={13}/></button></div></header>
-      <div className="page-content">
-      {loadError&&<div className="error-banner" role="alert"><span>{loadError}</span><div className="error-actions"><button onClick={()=>refresh()}>Retry</button>{connected&&<button onClick={async()=>{try{await signOut();setData(emptyClubData(startingDates.current));setLoadError('');setModal({type:'signin'});await refresh();}catch(e){setToast((e as Error).message);}}}>Switch account</button>}</div></div>}
-      {view==='sessions'&&<>
-        <section className="session-hero"><div className="session-date"><span className="eyebrow">{past?'PAST SESSION':'UPCOMING SESSION'}</span><h1>{relativeDate.toLocaleDateString('en-GB',{weekday:'long',timeZone:'Asia/Kolkata'})}<span>{relativeDate.getUTCDate()} <em>{relativeDate.toLocaleDateString('en-GB',{month:'short',timeZone:'Asia/Kolkata'})}</em></span></h1><div className="session-time"><Clock size={17}/><span>6–8 PM <span className="muted">IST</span></span><button className="text-button" onClick={calendar}>Add to calendar<ArrowUpRight size={15}/></button></div><div className="session-nav"><button className="icon-button" aria-label="Previous session" disabled={dates.indexOf(date)<=0} onClick={()=>setDate(dates[dates.indexOf(date)-1])}><ArrowLeft size={18}/></button><label className="date-select"><select aria-label="Choose session" value={date} onChange={e=>setDate(e.target.value)}>{dates.map(d=><option value={d} key={d}>{sessionLabel(d,true)}</option>)}</select><ChevronDown size={14}/></label><button className="icon-button" aria-label="Next session" disabled={dates.indexOf(date)>=dates.length-1} onClick={()=>setDate(dates[dates.indexOf(date)+1])}><ArrowRight size={18}/></button></div></div><div className="topic-panel"><span className="eyebrow">CURRENT TOPIC</span><h2>Graphs<GitFork size={23}/></h2><GraphArt/></div></section>
-        <section className="session-section" aria-labelledby="session-heading"><div className="section-heading"><h2 id="session-heading">Teaching slots <span className="count-pill">03</span></h2><span className="slots-filled mono">{loading?'Loading…':`${claims.length} / 3 filled`}</span></div>
-          <div className="teaching-grid">{[1,2,3].map(slot=>{const c=claims.find(x=>x.slot===slot);return c?<article className="teaching-card filled" key={slot}><div className="spot-top"><span className="slot-number">0{slot}</span><span className={'difficulty '+c.difficulty.toLowerCase()}>{c.difficulty}</span></div><div className="presenter"><Avatar name={c.name} size="small"/><span>{c.name}</span></div><button className="teaching-title" onClick={()=>setModal({type:'problem',problem:c})}>{c.title}<ArrowUpRight size={18}/></button><div className="prep-preview">{c.prep||'No prerequisites.'}</div><div className="teaching-bottom"><span className="tag">{c.topic}</span><button className="text-button" onClick={()=>c.name===data.profile&&!past?setModal({type:'claim',slot,claim:c}):setModal({type:'problem',problem:c})}>{c.name===data.profile&&!past?'Edit':'Prep'}<ArrowRight size={14}/></button></div></article>:<article className={'teaching-card empty empty-'+slot} key={slot}><div className="spot-top"><span className="slot-number">0{slot}</span><span className="open-label">{past?'UNFILLED':'OPEN'}</span></div><button className="claim-illustration" onClick={()=>claim(slot)} disabled={past||!!own} aria-label={'Claim teaching spot '+slot}><span className="orbit orbit-one"/><span className="orbit orbit-two"/><span className="plus-orb"><Plus size={24} strokeWidth={1.5}/></span><i className="orbit-point"/></button><button className="text-button" onClick={()=>claim(slot)} disabled={past||!!own}>{past?'Unfilled':own?'Already presenting':'Add question'}{!past&&!own&&<ArrowUpRight size={15}/>}</button></article>;})}</div>
-
-        </section>
-        <section className="shelf"><div className="section-heading"><div><h2>Graph practice</h2></div><button className="text-button" onClick={()=>setView('library')}>View all<ArrowUpRight size={17}/></button></div><div className="problem-grid">{SUGGESTIONS.map(problemCard)}</div></section>
-      </>}
-      {view==='library'&&<><section className="page-intro"><h1>Library<span className="title-count">{library.length}</span></h1><div className="library-progress"><span>{data.solved.filter(u=>library.some(p=>p.url===u)).length}<small> / {library.length}</small></span><div><strong>problems practiced</strong><div className="progress-track"><i style={{width:(data.solved.filter(u=>library.some(p=>p.url===u)).length/library.length*100)+'%'}}/></div></div><CheckCheck size={24}/></div></section><div className="library-tools"><div className="search-field"><Search size={18}/><input aria-label="Search problems" placeholder="Find a problem…" value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button className="icon-button" aria-label="Clear search" onClick={()=>setSearch('')}><X size={15}/></button>}</div><select aria-label="Filter by topic" value={topic} onChange={e=>setTopic(e.target.value)}>{['All topics',...TOPICS].map(t=><option key={t}>{t}</option>)}</select><select aria-label="Filter by practice status" value={filter} onChange={e=>setFilter(e.target.value)}>{['All problems','To practice','Completed'].map(t=><option key={t}>{t}</option>)}</select></div><div className="problem-grid library-grid">{filtered.map(problemCard)}</div>{!filtered.length&&<div className="empty-state"><Search size={34}/><h3>No matching problems.</h3><p>Try a different search or filter.</p><button className="button secondary" onClick={()=>{setSearch('');setTopic('All topics');setFilter('All problems');}}>Clear filters</button></div>}</>}
-      {view==='club'&&<><section className="page-intro members-intro"><h1>Members<span className="title-count">07</span></h1></section><div className="members-grid">{MEMBERS.map((name,i)=><article className={'member-card member-'+i} key={name}><span className="mono">0{i+1}</span><Avatar name={name} size="large"/><h3>{name}{name===data.profile&&<span className="you-tag">you</span>}</h3><span className="member-status">{data.roster.some(p=>p.name===name)?<><span className="live-dot"/> Joined</>:'Not joined'}</span></article>)}</div></>}
-
-
-      </div>
-    </main>
-    {toast&&<div className="toast" role="status"><Check size={17}/>{toast}<button className="icon-button" aria-label="Dismiss message" onClick={()=>setToast('')}><X size={15}/></button></div>}
-    {modal?.type==='claim'&&<Modal title={modal.claim?'Edit question':'Add question'} onClose={()=>setModal(null)}><QuestionForm date={date} slot={modal.slot} claim={modal.claim} suggestion={modal.suggestion} onSave={async values=>{await mutate({action:modal.claim?'edit':'claim',date,id:modal.claim?.id,revision:modal.claim?.revision,...values});setModal(null);setToast(connected?'Saved. Members notified.':'Saved in local preview.');}} onRelease={modal.claim?async()=>{await mutate({action:'release',date,id:modal.claim!.id,revision:modal.claim!.revision});setModal(null);setToast('Spot released.');}:undefined}/></Modal>}
-    {modal?.type==='join'&&<Modal title="Select member" onClose={()=>{setModal(null);pending.current=null;}}><div className="join-options">{MEMBERS.map(name=>{const taken=data.roster.some(p=>p.name===name);return <button className="join-option" disabled={(connected&&taken)||busy} key={name} onClick={async()=>{setBusy(true);setJoinError('');try{await mutate({action:'join',name});setModal(pending.current);pending.current=null;setToast('Selected '+name);}catch(e){setJoinError((e as Error).message);}finally{setBusy(false);}}}><Avatar name={name} size="small"/><strong>{name}</strong><span>{taken?'Joined':<ArrowUpRight size={16}/>}</span></button>;})}</div>{joinError&&<p className="form-error" role="alert">{joinError}</p>}</Modal>}
-    {modal?.type==='problem'&&<Modal title={modal.problem.title} onClose={()=>setModal(null)}><div className="detail-art"><ProblemArt kind={modal.problem.art||SUGGESTIONS.find(s=>s.url===modal.problem.url)?.art||'course'}/></div><div className="detail-meta"><span className="tag">{modal.problem.topic}</span><span className={'difficulty '+modal.problem.difficulty.toLowerCase()}>{modal.problem.difficulty}</span>{modal.problem.name&&<span className="detail-presenter">with {modal.problem.name}</span>}</div><div className="prep-detail"><span className="eyebrow">PREPARATION</span><p>{modal.problem.prep||'No prerequisites.'}</p></div>{modal.problem.practice&&<a className="practice-link" href={modal.problem.practice} target="_blank" rel="noreferrer"><span><BookOpen size={18}/> Related practice</span><ExternalLink size={16}/></a>}<a className="button primary full" href={modal.problem.url} target="_blank" rel="noreferrer">Open on LeetCode<ExternalLink size={17}/></a><div className="detail-actions"><button disabled={busy} className="text-button" onClick={()=>solve(modal.problem)}>{data.solved.includes(modal.problem.url)?<CheckCheck size={17}/>:<Check size={17}/>} {data.solved.includes(modal.problem.url)?'Practiced · mark incomplete':'Mark as practiced'}</button>{!modal.problem.name&&<button className="text-button" onClick={()=>claim(undefined,modal.problem)}>Add to session<ArrowUpRight size={17}/></button>}</div>{modal.problem.session_date&&<p className="field-hint">{sessionLabel(modal.problem.session_date)} · 6–8 PM IST</p>}</Modal>}
-    {modal?.type==='inbox'&&<Modal title="Inbox" onClose={()=>setModal(null)}><div className="inbox-top"><span>{unread} unread {unread===1?'update':'updates'}</span><button className="text-button" disabled={!unread} onClick={async()=>{try{await mutate({action:'read'});}catch(e){setToast((e as Error).message);}}}>Mark all read<CheckCheck size={15}/></button></div><div className="inbox-list">{data.inbox.length?data.inbox.map(n=><button className={'inbox-item '+(!n.read?'unread':'')} key={n.id} onClick={async()=>{try{await mutate({action:'read',id:n.id});setDate(n.session_date);setView('sessions');const problem=data.claims.find(c=>c.id===n.claim_id);setModal(problem?{type:'problem',problem}:null);}catch(e){setToast((e as Error).message);}}}><span className="inbox-dot"/><div><strong>{n.title}</strong><p>{n.body}</p><small>{new Date(n.created_at).toLocaleDateString('en-GB',{month:'short',day:'numeric',timeZone:'Asia/Kolkata'})}</small></div><ArrowUpRight size={16}/></button>):<div className="empty-state"><Bell size={32}/><h3>No updates.</h3></div>}</div><div className="notification-setting"><div><strong>Browser alerts</strong><p>While this tab is open.</p></div><button className={'toggle '+(browserAlerts?'on':'')} role="switch" aria-label="Browser alerts" aria-checked={browserAlerts} onClick={toggleNotifications}><span/></button></div>{permissionNote&&<p className="field-hint" role="status">{permissionNote}</p>}</Modal>}
-    {modal?.type==='profile'&&<Modal title="Profile" onClose={()=>setModal(null)}><div className="profile-detail"><Avatar name={data.profile!} size="large"/><h3>{data.profile}</h3><p>{data.solved.length} problems practiced · {data.claims.filter(c=>c.name===data.profile).length} teaching spots</p></div><div className="notification-setting"><div><strong>Browser alerts</strong><p>While this tab is open.</p></div><button className={'toggle '+(browserAlerts?'on':'')} role="switch" aria-label="Browser alerts" aria-checked={browserAlerts} onClick={toggleNotifications}><span/></button></div>{permissionNote&&<p className="field-hint" role="status">{permissionNote}</p>}{connected&&<button className="text-button signout" onClick={()=>setModal({type:'password'})}><KeyRound size={17}/>Change password</button>}<button className="text-button signout" onClick={async()=>{try{await signOut();setModal(null);await refresh();}catch(e){setToast((e as Error).message);}}}><LogOut size={17}/>{connected?'Sign out on this device':'Switch member'}</button></Modal>}
-    {modal?.type==='signin'&&<Modal title="Sign in" onClose={()=>{setModal(null);pending.current=null;}}><AuthForm onSaved={refresh}/></Modal>}
-    {modal?.type==='password'&&<Modal title="Change password" onClose={()=>setModal({type:'profile'})}><AuthForm changing onSaved={()=>{setModal({type:'profile'});setToast('Password updated.');}}/></Modal>}
-
-  </div>;
+  async function solve(problem: Problem) {
+    if (!ensureMember()) return;
+    setBusy(true);
+    try {
+      await mutate({
+        action: 'practice',
+        url: problem.url,
+        completed: !data.solved.includes(problem.url),
+      });
+    } catch (e) {
+      setToast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function calendar() {
+    const blob = new Blob([calendarEvent(date)], {
+      type: 'text/calendar;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'coding-club-' + date + '.ics';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setToast('Calendar file downloaded, with a 30-minute reminder.');
+  }
+  async function toggleNotifications() {
+    if (browserAlerts) {
+      try {
+        localStorage.setItem('club-browser-alerts', 'off');
+      } catch {}
+      enabled.current = false;
+      setBrowserAlerts(false);
+      return;
+    }
+    if (!('Notification' in window)) {
+      setPermissionNote(
+        'This browser does not support desktop notifications. Your inbox still works.',
+      );
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      try {
+        localStorage.setItem('club-browser-alerts', 'on');
+      } catch {}
+      enabled.current = true;
+      setBrowserAlerts(true);
+      setPermissionNote('Browser alerts are on while this site is open.');
+    } else
+      setPermissionNote(
+        'Notifications are blocked or dismissed. You can enable them in browser settings.',
+      );
+  }
+  const library: Problem[] = buildLibrary(
+    SUGGESTIONS,
+    data.claims,
+    data.practiced,
+  );
+  const filtered = library.filter(
+    (p) =>
+      (topic === 'All topics' || p.topic === topic) &&
+      p.title.toLowerCase().includes(search.toLowerCase()) &&
+      (filter === 'All problems' ||
+        (filter === 'Completed'
+          ? data.solved.includes(p.url)
+          : !data.solved.includes(p.url))),
+  );
+  const unread = data.inbox.filter((n) => !n.read).length;
+  const dates = Array.from(
+    new Set([...data.dates, ...data.claims.map((c) => c.session_date)]),
+  ).sort();
+  const relativeDate = new Date(date + 'T12:30:00Z');
+  function problemCard(p: Problem, index: number) {
+    const solved = data.solved.includes(p.url);
+    return (
+      <article className="problem-card" key={p.url}>
+        <button
+          className="art-button"
+          aria-label={'View ' + p.title}
+          onClick={() => setModal({ type: 'problem', problem: p })}
+        >
+          <ProblemArt
+            kind={
+              p.art || SUGGESTIONS.find((s) => s.url === p.url)?.art || 'course'
+            }
+          />
+          <span className="art-index">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+          <span className="art-arrow">
+            <ArrowUpRight size={18} />
+          </span>
+        </button>
+        <div className="problem-card-body">
+          <div className="problem-meta">
+            <span>
+              {p.number
+                ? 'LC ' + p.number
+                : p.name
+                  ? 'FROM THE CLUB'
+                  : 'LEETCODE'}
+            </span>
+            <span className={'difficulty ' + p.difficulty.toLowerCase()}>
+              {p.difficulty}
+            </span>
+          </div>
+          <button
+            className="problem-title"
+            onClick={() => setModal({ type: 'problem', problem: p })}
+          >
+            {p.title}
+          </button>
+          <div className="problem-bottom">
+            <span>{p.pattern || p.topic}</span>
+            <button
+              className={'solve-button ' + (solved ? 'done' : '')}
+              disabled={busy}
+              onClick={() => solve(p)}
+              aria-label={
+                (solved ? 'Mark incomplete: ' : 'Mark completed: ') + p.title
+              }
+              aria-pressed={solved}
+            >
+              {solved ? <Check size={15} /> : <span />}
+            </button>
+          </div>
+        </div>
+      </article>
+    );
+  }
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <button
+          className="wordmark"
+          onClick={() => setView('sessions')}
+          aria-label="Coding Club home"
+        >
+          <span className="logo">
+            <Code2 size={23} />
+          </span>
+          <span>CODING CLUB</span>
+        </button>
+        <nav aria-label="Main navigation">
+          {(
+            [
+              { id: 'sessions', label: 'Sessions', icon: CalendarDays },
+              { id: 'library', label: 'Library', icon: BookOpen },
+              { id: 'club', label: 'Members', icon: Users },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              className={view === item.id ? 'active' : ''}
+              onClick={() => setView(item.id)}
+            >
+              <item.icon size={17} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+        <span className="header-schedule mono">
+          TUE / THU <span>18:00—20:00 IST</span>
+        </span>
+      </aside>
+      <main className="main">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <span className="status-dot" />{' '}
+            {view === 'sessions'
+              ? 'Session board'
+              : view === 'library'
+                ? 'Problem library'
+                : 'Members'}
+          </div>
+          <div className="topbar-actions">
+            {!connected && (
+              <span
+                className="preview-badge"
+                title="Changes are saved in this browser only until Supabase is connected."
+              >
+                Local preview · not shared
+              </span>
+            )}
+            <button
+              className="icon-button bell-button"
+              aria-label={`Open inbox, ${unread} unread updates`}
+              onClick={() => {
+                if (ensureMember({ type: 'inbox' }))
+                  setModal({ type: 'inbox' });
+              }}
+            >
+              <Bell size={19} />
+              {unread > 0 && (
+                <span className="notification-count">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </button>
+            <button
+              className="profile-button"
+              aria-label={
+                data.profile
+                  ? `Profile: ${data.profile}`
+                  : connected
+                    ? 'Sign in'
+                    : 'Select member'
+              }
+              onClick={() => {
+                if (ensureMember({ type: 'profile' }))
+                  setModal({ type: 'profile' });
+              }}
+            >
+              {data.profile ? (
+                <Avatar name={data.profile} size="small" />
+              ) : (
+                <span className="avatar guest small">
+                  <Users size={16} />
+                </span>
+              )}
+              <span>
+                {data.profile || (connected ? 'Sign in' : 'Select member')}
+              </span>
+              <ChevronDown size={13} />
+            </button>
+          </div>
+        </header>
+        <div className="page-content">
+          {loadError && (
+            <div className="error-banner" role="alert">
+              <span>{loadError}</span>
+              <div className="error-actions">
+                <button onClick={() => refresh()}>Retry</button>
+                {connected && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await signOut();
+                        setData(emptyClubData(startingDates.current));
+                        setLoadError('');
+                        setModal({ type: 'signin' });
+                        await refresh();
+                      } catch (e) {
+                        setToast((e as Error).message);
+                      }
+                    }}
+                  >
+                    Switch account
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {view === 'sessions' && (
+            <>
+              <section className="session-hero">
+                <div className="session-date">
+                  <span className="eyebrow">
+                    {past ? 'PAST SESSION' : 'UPCOMING SESSION'}
+                  </span>
+                  <h1>
+                    {relativeDate.toLocaleDateString('en-GB', {
+                      weekday: 'long',
+                      timeZone: 'Asia/Kolkata',
+                    })}
+                    <span>
+                      {relativeDate.getUTCDate()}{' '}
+                      <em>
+                        {relativeDate.toLocaleDateString('en-GB', {
+                          month: 'short',
+                          timeZone: 'Asia/Kolkata',
+                        })}
+                      </em>
+                    </span>
+                  </h1>
+                  <div className="session-time">
+                    <Clock size={17} />
+                    <span>
+                      6–8 PM <span className="muted">IST</span>
+                    </span>
+                    <button className="text-button" onClick={calendar}>
+                      Add to calendar
+                      <ArrowUpRight size={15} />
+                    </button>
+                  </div>
+                  <div className="session-nav">
+                    <button
+                      className="icon-button"
+                      aria-label="Previous session"
+                      disabled={dates.indexOf(date) <= 0}
+                      onClick={() => setDate(dates[dates.indexOf(date) - 1])}
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
+                    <label className="date-select">
+                      <select
+                        aria-label="Choose session"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                      >
+                        {dates.map((d) => (
+                          <option value={d} key={d}>
+                            {sessionLabel(d, true)}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} />
+                    </label>
+                    <button
+                      className="icon-button"
+                      aria-label="Next session"
+                      disabled={dates.indexOf(date) >= dates.length - 1}
+                      onClick={() => setDate(dates[dates.indexOf(date) + 1])}
+                    >
+                      <ArrowRight size={18} />
+                    </button>
+                  </div>
+                </div>
+                <div className="topic-panel">
+                  <span className="eyebrow">CURRENT TOPIC</span>
+                  <h2>
+                    Graphs
+                    <GitFork size={23} />
+                  </h2>
+                  <GraphArt />
+                </div>
+              </section>
+              <section
+                className="session-section"
+                aria-labelledby="session-heading"
+              >
+                <div className="section-heading">
+                  <h2 id="session-heading">
+                    Teaching slots <span className="count-pill">03</span>
+                  </h2>
+                  <span className="slots-filled mono">
+                    {loading ? 'Loading…' : `${claims.length} / 3 filled`}
+                  </span>
+                </div>
+                <div className="teaching-grid">
+                  {[1, 2, 3].map((slot) => {
+                    const c = claims.find((x) => x.slot === slot);
+                    return c ? (
+                      <article className="teaching-card filled" key={slot}>
+                        <div className="spot-top">
+                          <span className="slot-number">0{slot}</span>
+                          <span
+                            className={
+                              'difficulty ' + c.difficulty.toLowerCase()
+                            }
+                          >
+                            {c.difficulty}
+                          </span>
+                        </div>
+                        <div className="presenter">
+                          <Avatar name={c.name} size="small" />
+                          <span>{c.name}</span>
+                        </div>
+                        <button
+                          className="teaching-title"
+                          onClick={() =>
+                            setModal({ type: 'problem', problem: c })
+                          }
+                        >
+                          {c.title}
+                          <ArrowUpRight size={18} />
+                        </button>
+                        <div className="prep-preview">
+                          {c.prep || 'No prerequisites.'}
+                        </div>
+                        <div className="teaching-bottom">
+                          <span className="tag">{c.topic}</span>
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              c.name === data.profile && !past
+                                ? setModal({ type: 'claim', slot, claim: c })
+                                : setModal({ type: 'problem', problem: c })
+                            }
+                          >
+                            {c.name === data.profile && !past ? 'Edit' : 'Prep'}
+                            <ArrowRight size={14} />
+                          </button>
+                        </div>
+                      </article>
+                    ) : (
+                      <article
+                        className={'teaching-card empty empty-' + slot}
+                        key={slot}
+                      >
+                        <div className="spot-top">
+                          <span className="slot-number">0{slot}</span>
+                          <span className="open-label">
+                            {past ? 'UNFILLED' : 'OPEN'}
+                          </span>
+                        </div>
+                        <button
+                          className="claim-illustration"
+                          onClick={() => claim(slot)}
+                          disabled={past || !!own}
+                          aria-label={'Claim teaching spot ' + slot}
+                        >
+                          <span className="orbit orbit-one" />
+                          <span className="orbit orbit-two" />
+                          <span className="plus-orb">
+                            <Plus size={24} strokeWidth={1.5} />
+                          </span>
+                          <i className="orbit-point" />
+                        </button>
+                        <button
+                          className="text-button"
+                          onClick={() => claim(slot)}
+                          disabled={past || !!own}
+                        >
+                          {past
+                            ? 'Unfilled'
+                            : own
+                              ? 'Already presenting'
+                              : 'Add question'}
+                          {!past && !own && <ArrowUpRight size={15} />}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+              <section className="shelf">
+                <div className="section-heading">
+                  <div>
+                    <h2>Graph practice</h2>
+                  </div>
+                  <button
+                    className="text-button"
+                    onClick={() => setView('library')}
+                  >
+                    View all
+                    <ArrowUpRight size={17} />
+                  </button>
+                </div>
+                <div className="problem-grid">
+                  {SUGGESTIONS.map(problemCard)}
+                </div>
+              </section>
+            </>
+          )}
+          {view === 'library' && (
+            <>
+              <section className="page-intro">
+                <h1>
+                  Library<span className="title-count">{library.length}</span>
+                </h1>
+                <div className="library-progress">
+                  <span>
+                    {
+                      data.solved.filter((u) =>
+                        library.some((p) => p.url === u),
+                      ).length
+                    }
+                    <small> / {library.length}</small>
+                  </span>
+                  <div>
+                    <strong>problems practiced</strong>
+                    <div className="progress-track">
+                      <i
+                        style={{
+                          width:
+                            (data.solved.filter((u) =>
+                              library.some((p) => p.url === u),
+                            ).length /
+                              library.length) *
+                              100 +
+                            '%',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <CheckCheck size={24} />
+                </div>
+              </section>
+              <div className="library-tools">
+                <div className="search-field">
+                  <Search size={18} />
+                  <input
+                    aria-label="Search problems"
+                    placeholder="Find a problem…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  {search && (
+                    <button
+                      className="icon-button"
+                      aria-label="Clear search"
+                      onClick={() => setSearch('')}
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+                <select
+                  aria-label="Filter by topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                >
+                  {['All topics', ...TOPICS].map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Filter by practice status"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                >
+                  {['All problems', 'To practice', 'Completed'].map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="problem-grid library-grid">
+                {filtered.map(problemCard)}
+              </div>
+              {!filtered.length && (
+                <div className="empty-state">
+                  <Search size={34} />
+                  <h3>No matching problems.</h3>
+                  <p>Try a different search or filter.</p>
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      setSearch('');
+                      setTopic('All topics');
+                      setFilter('All problems');
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+          {view === 'club' && (
+            <>
+              <section className="page-intro members-intro">
+                <h1>
+                  Members<span className="title-count">07</span>
+                </h1>
+              </section>
+              <div className="members-grid">
+                {MEMBERS.map((name, i) => (
+                  <article className={'member-card member-' + i} key={name}>
+                    <span className="mono">0{i + 1}</span>
+                    <Avatar name={name} size="large" />
+                    <h3>
+                      {name}
+                      {name === data.profile && (
+                        <span className="you-tag">you</span>
+                      )}
+                    </h3>
+                    <span className="member-status">
+                      {data.roster.some((p) => p.name === name) ? (
+                        <>
+                          <span className="live-dot" /> Joined
+                        </>
+                      ) : (
+                        'Not joined'
+                      )}
+                    </span>
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+      {toast && (
+        <div className="toast" role="status">
+          <Check size={17} />
+          {toast}
+          <button
+            className="icon-button"
+            aria-label="Dismiss message"
+            onClick={() => setToast('')}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+      {modal?.type === 'claim' && (
+        <Modal
+          title={modal.claim ? 'Edit question' : 'Add question'}
+          onClose={() => setModal(null)}
+        >
+          <QuestionForm
+            date={date}
+            slot={modal.slot}
+            claim={modal.claim}
+            suggestion={modal.suggestion}
+            onSave={async (values) => {
+              await mutate({
+                action: modal.claim ? 'edit' : 'claim',
+                date,
+                id: modal.claim?.id,
+                revision: modal.claim?.revision,
+                ...values,
+              });
+              setModal(null);
+              setToast(
+                connected
+                  ? 'Saved. Members notified.'
+                  : 'Saved in local preview.',
+              );
+            }}
+            onRelease={
+              modal.claim
+                ? async () => {
+                    await mutate({
+                      action: 'release',
+                      date,
+                      id: modal.claim!.id,
+                      revision: modal.claim!.revision,
+                    });
+                    setModal(null);
+                    setToast('Spot released.');
+                  }
+                : undefined
+            }
+          />
+        </Modal>
+      )}
+      {modal?.type === 'join' && (
+        <Modal
+          title="Select member"
+          onClose={() => {
+            setModal(null);
+            pending.current = null;
+          }}
+        >
+          <div className="join-options">
+            {MEMBERS.map((name) => {
+              const taken = data.roster.some((p) => p.name === name);
+              return (
+                <button
+                  className="join-option"
+                  disabled={(connected && taken) || busy}
+                  key={name}
+                  onClick={async () => {
+                    setBusy(true);
+                    setJoinError('');
+                    try {
+                      await mutate({ action: 'join', name });
+                      setModal(pending.current);
+                      pending.current = null;
+                      setToast('Selected ' + name);
+                    } catch (e) {
+                      setJoinError((e as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <Avatar name={name} size="small" />
+                  <strong>{name}</strong>
+                  <span>{taken ? 'Joined' : <ArrowUpRight size={16} />}</span>
+                </button>
+              );
+            })}
+          </div>
+          {joinError && (
+            <p className="form-error" role="alert">
+              {joinError}
+            </p>
+          )}
+        </Modal>
+      )}
+      {modal?.type === 'problem' && (
+        <Modal title={modal.problem.title} onClose={() => setModal(null)}>
+          <div className="detail-art">
+            <ProblemArt
+              kind={
+                modal.problem.art ||
+                SUGGESTIONS.find((s) => s.url === modal.problem.url)?.art ||
+                'course'
+              }
+            />
+          </div>
+          <div className="detail-meta">
+            <span className="tag">{modal.problem.topic}</span>
+            <span
+              className={'difficulty ' + modal.problem.difficulty.toLowerCase()}
+            >
+              {modal.problem.difficulty}
+            </span>
+            {modal.problem.name && (
+              <span className="detail-presenter">
+                with {modal.problem.name}
+              </span>
+            )}
+          </div>
+          <div className="prep-detail">
+            <span className="eyebrow">PREPARATION</span>
+            <p>{modal.problem.prep || 'No prerequisites.'}</p>
+          </div>
+          {modal.problem.practice && (
+            <a
+              className="practice-link"
+              href={modal.problem.practice}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span>
+                <BookOpen size={18} /> Related practice
+              </span>
+              <ExternalLink size={16} />
+            </a>
+          )}
+          <a
+            className="button primary full"
+            href={modal.problem.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open on LeetCode
+            <ExternalLink size={17} />
+          </a>
+          <div className="detail-actions">
+            <button
+              disabled={busy}
+              className="text-button"
+              onClick={() => solve(modal.problem)}
+            >
+              {data.solved.includes(modal.problem.url) ? (
+                <CheckCheck size={17} />
+              ) : (
+                <Check size={17} />
+              )}{' '}
+              {data.solved.includes(modal.problem.url)
+                ? 'Practiced · mark incomplete'
+                : 'Mark as practiced'}
+            </button>
+            {!modal.problem.name && (
+              <button
+                className="text-button"
+                onClick={() => claim(undefined, modal.problem)}
+              >
+                Add to session
+                <ArrowUpRight size={17} />
+              </button>
+            )}
+          </div>
+          {modal.problem.session_date && (
+            <p className="field-hint">
+              {sessionLabel(modal.problem.session_date)} · 6–8 PM IST
+            </p>
+          )}
+        </Modal>
+      )}
+      {modal?.type === 'inbox' && (
+        <Modal title="Inbox" onClose={() => setModal(null)}>
+          <div className="inbox-top">
+            <span>
+              {unread} unread {unread === 1 ? 'update' : 'updates'}
+            </span>
+            <button
+              className="text-button"
+              disabled={!unread}
+              onClick={async () => {
+                try {
+                  await mutate({ action: 'read' });
+                } catch (e) {
+                  setToast((e as Error).message);
+                }
+              }}
+            >
+              Mark all read
+              <CheckCheck size={15} />
+            </button>
+          </div>
+          <div className="inbox-list">
+            {data.inbox.length ? (
+              data.inbox.map((n) => (
+                <button
+                  className={'inbox-item ' + (!n.read ? 'unread' : '')}
+                  key={n.id}
+                  onClick={async () => {
+                    try {
+                      await mutate({ action: 'read', id: n.id });
+                      setDate(n.session_date);
+                      setView('sessions');
+                      const problem = data.claims.find(
+                        (c) => c.id === n.claim_id,
+                      );
+                      setModal(problem ? { type: 'problem', problem } : null);
+                    } catch (e) {
+                      setToast((e as Error).message);
+                    }
+                  }}
+                >
+                  <span className="inbox-dot" />
+                  <div>
+                    <strong>{n.title}</strong>
+                    <p>{n.body}</p>
+                    <small>
+                      {new Date(n.created_at).toLocaleDateString('en-GB', {
+                        month: 'short',
+                        day: 'numeric',
+                        timeZone: 'Asia/Kolkata',
+                      })}
+                    </small>
+                  </div>
+                  <ArrowUpRight size={16} />
+                </button>
+              ))
+            ) : (
+              <div className="empty-state">
+                <Bell size={32} />
+                <h3>No updates.</h3>
+              </div>
+            )}
+          </div>
+          <div className="notification-setting">
+            <div>
+              <strong>Browser alerts</strong>
+              <p>While this tab is open.</p>
+            </div>
+            <button
+              className={'toggle ' + (browserAlerts ? 'on' : '')}
+              role="switch"
+              aria-label="Browser alerts"
+              aria-checked={browserAlerts}
+              onClick={toggleNotifications}
+            >
+              <span />
+            </button>
+          </div>
+          {permissionNote && (
+            <p className="field-hint" role="status">
+              {permissionNote}
+            </p>
+          )}
+        </Modal>
+      )}
+      {modal?.type === 'profile' && (
+        <Modal title="Profile" onClose={() => setModal(null)}>
+          <div className="profile-detail">
+            <Avatar name={data.profile!} size="large" />
+            <h3>{data.profile}</h3>
+            <p>
+              {data.solved.length} problems practiced ·{' '}
+              {data.claims.filter((c) => c.name === data.profile).length}{' '}
+              teaching spots
+            </p>
+          </div>
+          <div className="notification-setting">
+            <div>
+              <strong>Browser alerts</strong>
+              <p>While this tab is open.</p>
+            </div>
+            <button
+              className={'toggle ' + (browserAlerts ? 'on' : '')}
+              role="switch"
+              aria-label="Browser alerts"
+              aria-checked={browserAlerts}
+              onClick={toggleNotifications}
+            >
+              <span />
+            </button>
+          </div>
+          {permissionNote && (
+            <p className="field-hint" role="status">
+              {permissionNote}
+            </p>
+          )}
+          {connected && (
+            <button
+              className="text-button signout"
+              onClick={() => setModal({ type: 'password' })}
+            >
+              <KeyRound size={17} />
+              Change password
+            </button>
+          )}
+          <button
+            className="text-button signout"
+            onClick={async () => {
+              try {
+                await signOut();
+                setModal(null);
+                await refresh();
+              } catch (e) {
+                setToast((e as Error).message);
+              }
+            }}
+          >
+            <LogOut size={17} />
+            {connected ? 'Sign out on this device' : 'Switch member'}
+          </button>
+        </Modal>
+      )}
+      {modal?.type === 'signin' && (
+        <Modal
+          title="Sign in"
+          onClose={() => {
+            setModal(null);
+            pending.current = null;
+          }}
+        >
+          <AuthForm onSaved={refresh} />
+        </Modal>
+      )}
+      {modal?.type === 'password' && (
+        <Modal
+          title="Change password"
+          onClose={() => setModal({ type: 'profile' })}
+        >
+          <AuthForm
+            changing
+            onSaved={() => {
+              setModal({ type: 'profile' });
+              setToast('Password updated.');
+            }}
+          />
+        </Modal>
+      )}
+    </div>
+  );
 }

@@ -1,1 +1,23 @@
-{"compilerOptions":{"target":"ES2022","lib":["DOM","DOM.Iterable","ES2022"],"module":"ESNext","moduleResolution":"bundler","jsx":"react-jsx","allowJs":true,"skipLibCheck":true,"strict":true,"noEmit":true,"esModuleInterop":true,"types":["vite/client"]},"include":["app/**/*.tsx","app/types.ts","lib/backend.ts","main.tsx","vite.config.ts"],"exclude":["app/api","app/layout.tsx","app/page.tsx"]}
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "types": ["vite/client"]
+  },
+  "include": [
+    "app/**/*.tsx",
+    "app/types.ts",
+    "lib/backend.ts",
+    "main.tsx",
+    "vite.config.ts"
+  ],
+  "exclude": ["app/api", "app/layout.tsx", "app/page.tsx"]
+}
