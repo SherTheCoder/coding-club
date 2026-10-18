@@ -23,9 +23,9 @@ The production output is `dist/`. Assets use relative paths, so a repository Pag
 
 1. Create a Supabase project.
 2. Run [supabase/setup.sql](supabase/setup.sql) **once** in its SQL editor. This creates four tables, the seven named members, and two authenticated RPCs. Row-level security is enabled and direct table access is denied.
-3. In the Supabase Table Editor, set `email` for each row of `club_members` to that member’s real, lowercase email. No email is included in this repository. Email verification determines the member’s identity; visitors cannot claim somebody else’s name.
+3. In the Supabase Table Editor, set `email` for each row of `club_members` to that member’s real, lowercase email. No email is included in this repository. The authenticated account determines the member’s identity; visitors cannot claim somebody else’s name.
 4. In Authentication → URL Configuration, set **Site URL** and an allowed redirect URL to your exact Pages URL, including its repository path and trailing slash, e.g. `https://sherthecoder.github.io/coding-club/`. Add your local development URL if you need it.
-5. Keep email sign-in enabled. Configure a production SMTP provider for delivery to the seven members; Supabase’s default email service has delivery restrictions. The site uses email magic links. Leave time-boxed sessions, inactivity timeouts, and single-session restrictions disabled to keep each device signed in. Sessions persist in the browser and refresh automatically; signing out affects only the current device. Clearing browser data, using private browsing, or revoking a session requires signing in again. No emails have been sent by this setup.
+5. Keep the Email provider enabled and disable **Allow new users to sign up**. Create the seven member accounts through the Supabase Auth Admin API with their assigned email, a unique strong password, and `email_confirm: true`. These are administrator-provisioned accounts; no verification or invitation email is sent. Share each initial password privately with its member. No SMTP provider is required. Leave time-boxed sessions, inactivity timeouts, and single-session restrictions disabled.
 6. Copy `.env.example` to `.env.local` and fill in the project URL and **publishable key** (legacy `anon` key also works). Never use a secret or `service_role` key in the frontend.
 7. Restart the dev server. The local-preview badge disappears when configuration is present. Each member signs in using the email assigned to them in `club_members`.
 
@@ -45,7 +45,9 @@ Without those two variables, Pages still deploys, but it runs local preview mode
 
 ## Sign-in behavior
 
-Members sign in once per browser profile. The app restores the saved Supabase session on later visits and silently refreshes expired access tokens. There is no app-imposed session timeout. Signing out on one device leaves other devices signed in.
+Members sign in with their assigned email and password once per browser profile. The app restores the saved Supabase session on later visits and silently refreshes expired access tokens. There is no app-imposed session timeout. Signing out on one device leaves other devices signed in. Clearing browser data, private browsing, or an administrator revoking a session requires signing in again.
+
+Members can choose a new password in **Profile → Change password** after entering their current password. New passwords must be at least 12 characters. Forgotten passwords require an administrator reset through the Supabase Auth Admin API; there is no email recovery dependency. Keep administrator credentials and initial member passwords out of this repository.
 
 ## Features
 
@@ -62,11 +64,11 @@ In-site prep reminders are added when a member opens or refreshes the app from 4
 
 Domain and client-state tests run in Node. The actual Supabase SQL is executed against an embedded PostgreSQL instance (PGlite), with test-only stand-ins for Supabase’s `auth.uid()` and `auth.jwt()`. Tests cover sign-in persistence across client restarts, silent token renewal, device-only sign-out, the email allowlist, direct-access denial, ownership, capacity, duplicates, stale revisions, seven-member notification fanout, practice persistence, and inbox isolation.
 
-A live Supabase project and email delivery still need verification after you connect your settings. The local-preview adapter is for trying the interface, not a shared database.
+For a new deployment, also verify password sign-in and the member mapping against its live Supabase project. The local-preview adapter is for trying the interface, not a shared database.
 
 ## References
 
 - [Vite: GitHub Pages deployment](https://vite.dev/guide/static-deploy.html#github-pages)
-- [Supabase: passwordless email sign-in](https://supabase.com/docs/guides/auth/auth-email-passwordless)
+- [Supabase: password sign-in](https://supabase.com/docs/guides/auth/passwords)
 - [Supabase: row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [Supabase: custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
+- [Supabase: administrator-created accounts](https://supabase.com/docs/reference/javascript/auth-admin-createuser)

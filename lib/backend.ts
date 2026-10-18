@@ -1,4 +1,4 @@
-import {createClubClient,signOutThisDevice} from './auth.mjs';
+import {createClubClient,signOutThisDevice,signInMember,changeMemberPassword} from './auth.mjs';
 import {MEMBERS,SUGGESTIONS,upcomingSessions,validateQuestion,isOpenSession,problemLink} from './club.mjs';
 import {emptyClubData} from './client-state.mjs';
 import type {ClubData,Claim,Notice,Problem} from '../app/types';
@@ -22,7 +22,8 @@ export async function loadClub():Promise<ClubData>{
   const state=readLocal();const profile=localStorage.getItem(ACTOR);const practiced=profile?state.practice[profile]||[]:[];
   return {signedIn:true,profile,claims:state.claims,roster:state.roster,inbox:state.inbox.filter(n=>n.recipient===profile).sort((a,b)=>b.created_at.localeCompare(a.created_at)),solved:practiced.map(p=>p.url),practiced,dates:upcomingSessions()};
 }
-export async function sendSignIn(email:string){if(!supabase)return;const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:new URL('.',window.location.href).href,shouldCreateUser:true}});if(error)throw error;}
+export async function signIn(email:string,password:string){if(!supabase)throw new Error('Sign-in is unavailable in local preview.');await signInMember(supabase,email,password);}
+export async function changePassword(currentPassword:string,password:string){if(!supabase)throw new Error('Sign-in is unavailable in local preview.');await changeMemberPassword(supabase,currentPassword,password);}
 export async function signOut(){if(supabase){await signOutThisDevice(supabase);}else localStorage.removeItem(ACTOR);}
 export function onIdentityChange(callback:()=>void){if(supabase){const {data}=supabase.auth.onAuthStateChange(()=>setTimeout(callback,0));return()=>data.subscription.unsubscribe();}window.addEventListener('storage',callback);return()=>window.removeEventListener('storage',callback);}
 export async function saveChange(payload:any):Promise<{ok:boolean;id?:string}>{
